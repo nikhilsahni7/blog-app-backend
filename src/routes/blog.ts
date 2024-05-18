@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import { PrismaClient } from "@prisma/client/edge";
+import { PrismaClient, Prisma } from "@prisma/client/edge";
 import { withAccelerate } from "@prisma/extension-accelerate";
 import { verify } from "hono/jwt";
 import { createBlog, updateBlog } from "@nikhilsahni/blog-app-common";
 import { ZodError } from "zod";
-import { Prisma } from "@prisma/client";
+
+// Simple HTML sanitization function
 
 export const blogRoutes = new Hono<{
   Bindings: {
@@ -75,11 +76,11 @@ blogRoutes.post("/", async (c) => {
 });
 
 blogRoutes.put("/", async (c) => {
-  try {
-    const prisma = new PrismaClient({
-      datasourceUrl: c.env.DATABASE_URL,
-    }).$extends(withAccelerate());
+  const prisma = new PrismaClient({
+    datasourceUrl: c.env.DATABASE_URL,
+  }).$extends(withAccelerate());
 
+  try {
     const body = await c.req.json();
     const { success, error } = updateBlog.safeParse(body);
 
@@ -108,16 +109,28 @@ blogRoutes.put("/", async (c) => {
     }
     c.status(500);
     return c.json({ error: "Internal Server Error" });
+  } finally {
+    await prisma.$disconnect();
   }
 });
 
 blogRoutes.get("/bulk", async (c) => {
-  try {
-    const prisma = new PrismaClient({
-      datasourceUrl: c.env.DATABASE_URL,
-    }).$extends(withAccelerate());
+  const prisma = new PrismaClient({
+    datasourceUrl: c.env.DATABASE_URL,
+  }).$extends(withAccelerate());
 
+  try {
     const blogs = await prisma.post.findMany({
+      select: {
+        content: true,
+        title: true,
+        id: true,
+        author: {
+          select: {
+            name: true,
+          },
+        },
+      },
       take: 10,
       skip: 0,
     });
@@ -132,19 +145,31 @@ blogRoutes.get("/bulk", async (c) => {
     }
     c.status(500);
     return c.json({ error: "Internal Server Error" });
+  } finally {
+    await prisma.$disconnect();
   }
 });
 
 blogRoutes.get("/:id", async (c) => {
-  try {
-    const prisma = new PrismaClient({
-      datasourceUrl: c.env.DATABASE_URL,
-    }).$extends(withAccelerate());
+  const prisma = new PrismaClient({
+    datasourceUrl: c.env.DATABASE_URL,
+  }).$extends(withAccelerate());
 
+  try {
     const id = c.req.param("id");
     const blog = await prisma.post.findUnique({
       where: {
         id,
+      },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        author: {
+          select: {
+            name: true,
+          },
+        },
       },
     });
 
@@ -163,5 +188,7 @@ blogRoutes.get("/:id", async (c) => {
     }
     c.status(500);
     return c.json({ error: "Internal Server Error" });
+  } finally {
+    await prisma.$disconnect();
   }
 });
