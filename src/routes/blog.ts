@@ -131,8 +131,6 @@ blogRoutes.get("/bulk", async (c) => {
           },
         },
       },
-      take: 10,
-      skip: 0,
     });
 
     return c.json({
